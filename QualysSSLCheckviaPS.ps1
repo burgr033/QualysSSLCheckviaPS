@@ -46,9 +46,9 @@ Write-Log "Bound parameters: $($PSBoundParameters | Out-String)"
 Write-Log "create output file"
 New-Item $report -ItemType File -ErrorAction SilentlyContinue
 # add content to file
-"Grad erreicht;IP-Adresse;Hostname;Progress;Report-Link;Warnungen vorhanden?" | Add-Content $report
+"GRADE;IPADDRESS;HOSTNAME;PROGRESS;LINK;WARNINGS?" | Add-Content $report
 
-Write-Log "start tls check..."
+Write-Log "start TLS check..."
 foreach($hostname in $hosts){
     $requestURI = "https://api.ssllabs.com/api/v2/analyze?host=$hostname&publish=off&startnew=on"
     Write-Log "tls check: $($hostname), Request URL $($requestURI) ------------------" 

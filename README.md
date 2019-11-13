@@ -7,7 +7,6 @@ You don't want to check all your TLS certificates on ssllabs.com in your browser
 The intention was plain laziness. I put it on github because some fella on reddit said i should.
 
 ## next?
-- I'm working on the option to get an E-Mail report.
 - Some error detection
 - logging
 

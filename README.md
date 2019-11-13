@@ -8,7 +8,6 @@ The intention was plain laziness. I put it on github because some fella on reddi
 
 ## next?
 - Some error detection
-- logging
 
 ## ok?
 No warranty, no support, yadayada

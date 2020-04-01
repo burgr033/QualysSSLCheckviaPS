@@ -1,17 +1,20 @@
-$version = "0.2"
+$version = "0.3"
 $pathApp = "$(Split-Path -Parent $MyInvocation.MyCommand.Path)"
 $fileApp = "$([System.IO.Path]::GetFileNameWithoutExtension($MyInvocation.MyCommand.Path ))"
 $fileLog = $fileApp + ".log"
 
 #List of Hosts you want to check
-$hosts = "www.github.com"
+$hosts = "github.com"
 
 $date = get-date -Format "dd.MM.yyyy"
 $report = "$pathApp\$($fileApp)-report_$date.csv"
 
+#csv delimiter
+$delimiter = ";"
+
 #E-Mail Details
-$emailFrom = ''
-$emailTo = ''
+$emailFrom = 'service@example.com'
+$emailTo = 'admin@example.com'
 $subject="TLS Certificate Checks $date"
 $smtpserver=''
 $style = "<style>BODY{font-family: Arial; font-size: 10pt;}"
@@ -46,27 +49,32 @@ Write-Log "Bound parameters: $($PSBoundParameters | Out-String)"
 Write-Log "create output file"
 New-Item $report -ItemType File -ErrorAction SilentlyContinue
 # add content to file
-"GRADE;IPADDRESS;HOSTNAME;PROGRESS;LINK;WARNINGS?" | Add-Content $report
+"GRADE$($delimiter)IPADDRESS$($delimiter)HOSTNAME$($delimiter)PROGRESS$($delimiter)LINK$($delimiter)WARNINGS?" | Add-Content $report
 
 Write-Log "start TLS check..."
 foreach($hostname in $hosts){
-    $requestURI = "https://api.ssllabs.com/api/v2/analyze?host=$hostname&publish=off&startnew=on"
-    Write-Log "tls check: $($hostname), Request URL $($requestURI) ------------------" 
+    $requestURI = "https://api.ssllabs.com/api/v2/analyze?host=$hostname&publish=off&startNew=on"
+    #$requestURI = "https://api.ssllabs.com/api/v2/analyze?host=$hostname&publish=off"
+    Write-Log "tls check: $($hostname), Request URL $($requestURI)" 
 
     
     $webRequest = Invoke-RestMethod  $requestURI
-    Write-Log "start web request :" . $webRequest|out-string
+    
+    Foreach($endpoint in $($webRequest.endpoints)){
+    
+    }
     while($webRequest.status -ne "READY"){
         if ( $webRequest -eq $null ) {
             Write-Log "WebRequest is Null"
-        } else {        
-            Write-Log "wait for status equal 'ready' [$($webRequest.status)]" 
+        } else {
+            Foreach($endpoint in $($webRequest.endpoints)){
+                Write-Log "found endpoint: $($endpoint.serverName) IP: [$($endpoint.ipAddress)] Progress: $($endpoint.progress)"
+            }
+            Write-Log "wait for status equal '[READY]' current: [$($webRequest.status)]" 
         }
-        Write-Log "Response $($webRequest.endpoints)"
         sleep 15
 
         $webRequest = Invoke-RestMethod  $requestURI
-        Write-Log "start web request :" . $webRequest|out-string
     }
     Write-Log "tls report is available"     
     foreach ($item in $webRequest.endpoints){
@@ -74,7 +82,7 @@ foreach($hostname in $hosts){
         if($item.haswarnings -eq $true){
             $warnings = "Warnungen gefunden!"
         }
-        $newline = "$($item.grade);$($item.ipAddress);$($hostname);$($item.progress)%;https://www.ssllabs.com/ssltest/analyze.html?d=$hostname;$warnings"
+        $newline = "$($item.grade)$($delimiter)$($item.ipAddress)$($delimiter)$($hostname)$($delimiter)$($item.progress)%$($delimiter)https://www.ssllabs.com/ssltest/analyze.html?d=$hostname$($delimiter)$warnings"
         $newline | Add-Content $report
     }
 
@@ -83,10 +91,18 @@ Write-Log "send mail"
 $message = New-Object System.Net.Mail.MailMessage ($emailfrom, $emailTo)
 $message.Subject = $subject
 $message.IsBodyHTML = $true
-$cont = Import-CSV $report -Delimiter ";" | Convertto-html -As Table -Head $style
+$cont = Import-CSV $report -Delimiter "$delimiter" | Convertto-html -As Table -Head $style
 $message.Body = $cont
 $smtp=new-object Net.Mail.SmtpClient($smtpServer)
-$smtp.Send($message)
-Write-Log "mail sent"
-Remove-Item $report
-Write-Log "report removed"
+try{
+    Write-Log "sending mail"
+    $smtp.Send($message)
+}
+catch{
+    Write-Log "mail could not be sent; generating html report"
+    Set-Content -Value $cont -Path "$($report).html"
+}
+finally{
+    Remove-Item $report
+    Write-Log "csv report removed"
+}
